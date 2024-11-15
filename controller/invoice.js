@@ -32,7 +32,7 @@ exports.createInvoice = async (req, res) => {
      
       // Define the path where you want to save the PDF
       const invoicesDir = path.join(__dirname, '../invoicePdf');
-      const pdfPath = path.join(invoicesDir, `invoice_${userId}_${Date.now()}.pdf`);    
+      const pdfPath = path.join(invoicesDir, `${newInvoice._id}_invoice_${userId}.pdf`);    
   
       // Check if the invoices directory exists, and create it if it doesn't
       if (!fs.existsSync(invoicesDir)) {
@@ -64,8 +64,22 @@ exports.createInvoice = async (req, res) => {
 exports.viewInvoices = async (req, res) => {
   const userId = req.user.id;
   try {
-    const invoices = await Invoice.find({ userId }).populate("products");
-    res.json(invoices);
+    const invoices = await Invoice.find({ userId });
+
+    if (!invoices || invoices.length === 0) {
+      return res.status(404).json({ message: "No quotations found." });
+    }
+
+     // Map invoices to include download links
+     const pdfList = invoices.map(invoice => {
+      const pdfPath = path.join(__dirname, 'invoices', `${invoice._id}_invoice_${invoice.userId}.pdf`);
+      return {
+          id: invoice._id,
+          date: invoice.createdAt,
+          downloadLink: pdfPath,
+      };
+    });
+    res.json(pdfList);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
