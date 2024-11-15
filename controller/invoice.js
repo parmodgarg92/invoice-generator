@@ -2,17 +2,19 @@ const generateInvoice = require("../helper/generateInvoice");
 const Invoice = require("../models/Invoice");
 const path = require("path");
 const fs = require("fs");
+const generatePdfSnapshot = require("../helper/generatePdfSnapshot");
 
 exports.createInvoice = async (req, res) => {
   const { products } = req.body;
   const userId = req.user.id;
   const gst = 0.18;
-  console.log(products,'products');
-  console.log(userId,'userId');
+
+  /** check product exists */
   if (!products || products.length === 0) {
     return res.status(400).json({ message: "No products selected" });
   }
 
+  /** check if user exists or token vefified */
   if (!userId || userId.length === 0) {
     return res.status(403).json({ message: "Forbidden error" });
   }
@@ -32,6 +34,7 @@ exports.createInvoice = async (req, res) => {
      
       // Define the path where you want to save the PDF
       const invoicesDir = path.join(__dirname, '../invoicePdf');
+      const invoiceImage = path.join(__dirname,'../invoiceImage');
       const pdfPath = path.join(invoicesDir, `${newInvoice._id}_invoice_${userId}.pdf`);    
   
       // Check if the invoices directory exists, and create it if it doesn't
@@ -40,8 +43,20 @@ exports.createInvoice = async (req, res) => {
           fs.mkdirSync(invoicesDir, { recursive: true });
   
       }
+
      // Save the PDF buffer to a file
      fs.writeFileSync(pdfPath, pdfBuffer);
+
+     // Check if the invoicesImage directory exists, and create it if it doesn't
+     if (!fs.existsSync(invoiceImage)) {
+      fs.mkdirSync(invoiceImage, { recursive: true });
+     }
+
+     const outputImagePath = path.join(invoiceImage, `${newInvoice._id}_invoice_${userId}.png`);
+     
+     await generatePdfSnapshot(pdfPath, outputImagePath)
+        .then(() => console.log('PDF snapshot created successfully!'))
+        .catch(err => console.error('Error creating PDF snapshot:', err));
  
      // Set response headers
      res.set({
