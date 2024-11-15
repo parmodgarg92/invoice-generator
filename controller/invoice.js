@@ -1,12 +1,7 @@
 const generateInvoice = require("../helper/generateInvoice");
 const Invoice = require("../models/Invoice");
-require('web-streams-polyfill/ponyfill/es6');
-
-// const fetch = require('node-fetch');
-
-// if (typeof ReadableStream === 'undefined') {
-//   global.ReadableStream = require('stream').Readable;
-// }
+const path = require("path");
+const fs = require("fs");
 
 exports.createInvoice = async (req, res) => {
   const { products } = req.body;
@@ -24,22 +19,43 @@ exports.createInvoice = async (req, res) => {
   
   try {
 
-    products.map(async (productId) => {
-       productId.gst = (productId.rate * gst * productId.qty);
-       productId.total = (productId.rate * productId.qty) + productId.gst;
-       return productId;
-    });
+    const processProducts = await Promise.all(products.map(async (product) => {
+        product.gst = (product.rate * gst * product.qty);
+        product.total = (product.rate * product.qty) + product.gst;
+        return product;
+    }));
     
-    const newInvoice = new Invoice({ userId, products, date: new Date() });
-
-    console.log(newInvoice,'newInvoice');
+    const newInvoice = new Invoice({ userId, products: processProducts, date: new Date() });
     await newInvoice.save();
 
-    // res.send({ message: "Invoice created successfully" });
-    const pdfBuffer = await generateInvoice(products);
-    console.log('after pdf buffer')
-    res.set("Content-Type", "application/pdf");
-    res.send(pdfBuffer);
+    const pdfBuffer = await generateInvoice(processProducts);
+     
+      // Define the path where you want to save the PDF
+      const invoicesDir = path.join(__dirname, '../invoicePdf');
+      const pdfPath = path.join(invoicesDir, `invoice_${userId}_${Date.now()}.pdf`);    
+  
+      // Check if the invoices directory exists, and create it if it doesn't
+      if (!fs.existsSync(invoicesDir)) {
+  
+          fs.mkdirSync(invoicesDir, { recursive: true });
+  
+      }
+     // Save the PDF buffer to a file
+     fs.writeFileSync(pdfPath, pdfBuffer);
+ 
+     // Set response headers
+     res.set({
+         'Content-Type': 'application/pdf',
+         'Content-Disposition': `attachment; filename=invoice_${userId}.pdf`,
+     });
+ 
+     // Send the PDF file as a response
+     res.sendFile(pdfPath, (err) => {
+        if (err) {
+            console.error('Error sending file:', err);
+            res.status(500).send(err);
+        }
+     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
