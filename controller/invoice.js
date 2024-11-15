@@ -1,30 +1,48 @@
+const generateInvoice = require("../helper/generateInvoice");
 const Invoice = require("../models/Invoice");
-const Product = require("../models/Product");
-const puppeteer = require("puppeteer");
+require('web-streams-polyfill/ponyfill/es6');
+
+// const fetch = require('node-fetch');
+
+// if (typeof ReadableStream === 'undefined') {
+//   global.ReadableStream = require('stream').Readable;
+// }
 
 exports.createInvoice = async (req, res) => {
   const { products } = req.body;
   const userId = req.user.id;
+  const gst = 0.18;
+  console.log(products,'products');
+  console.log(userId,'userId');
+  if (!products || products.length === 0) {
+    return res.status(400).json({ message: "No products selected" });
+  }
 
+  if (!userId || userId.length === 0) {
+    return res.status(403).json({ message: "Forbidden error" });
+  }
+  
   try {
+
+    products.map(async (productId) => {
+       productId.gst = (productId.rate * gst * productId.qty);
+       productId.total = (productId.rate * productId.qty) + productId.gst;
+       return productId;
+    });
+    
     const newInvoice = new Invoice({ userId, products, date: new Date() });
+
+    console.log(newInvoice,'newInvoice');
     await newInvoice.save();
 
-    const pdfBuffer = await generatePDF(products);
+    // res.send({ message: "Invoice created successfully" });
+    const pdfBuffer = await generateInvoice(products);
+    console.log('after pdf buffer')
     res.set("Content-Type", "application/pdf");
     res.send(pdfBuffer);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: error.message });
   }
-};
-
-const generatePDF = async (products) => {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-  await page.setContent(`<h1>Invoice</h1><p>Product List: ${JSON.stringify(products)}</p>`);
-  const pdfBuffer = await page.pdf({ format: "A4" });
-  await browser.close();
-  return pdfBuffer;
 };
 
 exports.viewInvoices = async (req, res) => {
