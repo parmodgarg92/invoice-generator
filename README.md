@@ -29,7 +29,7 @@ This application allows users to generate PDFs, create snapshots of those PDFs, 
 
    ```bash
    git clone https://github.com/parmodgarg92/invoice-generator.git
-   cd pdf-snapshot-app
+   cd invoice-generator
 
    After clone this repository visit the root directory of the folder and run the npm install command.
 
